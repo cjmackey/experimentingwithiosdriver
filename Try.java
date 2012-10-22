@@ -12,7 +12,9 @@ import org.uiautomation.ios.client.uiamodels.impl.RemoteUIADriver;
 public class Try {
     public static void main(String[] args) {
 	
-	IOSCapabilities cap = IOSCapabilities.iphone("InternationalMountains", "1.1");
+	IOSCapabilities cap = IOSCapabilities.iphone(System.getenv().get("APP_NAME"),
+						     System.getenv().get("APP_VERSION"));
+	    //						     "InternationalMountains", "1.1");
 	//cap.setLanguage("zh-Hant");
 	cap.setLanguage("en");
 	

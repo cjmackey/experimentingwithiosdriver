@@ -6,7 +6,7 @@
 # `mvn package -Dmaven.test.skip=true`
 # 
 # And you need to run the server (server-standalone-1.0.0-SNAPSHOT.jar):
-# `java -jar server-standalone-1.0.0-SNAPSHOT.jar -aut ~/Documents/build/myapp.app -port 4444`
+# `rake server`
 # 
 # Then, `rake run` or whatever.
 # 
@@ -19,21 +19,11 @@
 
 
 
+ENV['APP_DIR'] ||= '~/Documents/build/InternationalMountains.app'
+ENV['APP_NAME'] ||= 'InternationalMountains'
+ENV['APP_VERSION'] ||= '1.1'
 
 
-
-
-
-cpl = ['/Users/carl/prog/ios-driver/client/target/ios-client-1.0.0-SNAPSHOT.jar',
-       '/Users/carl/prog/ios-driver/common/target/ios-common-1.0.0-SNAPSHOT.jar',
-       '/Users/carl/Downloads/commons-codec-1.7.jar',
-       '/Users/carl/Downloads/commons-io-2.4.jar',
-       '/Users/carl/Downloads/commons-logging-1.1.1.jar',
-       '/Users/carl/Downloads/httpclient-4.2.1.jar',
-       '/Users/carl/Downloads/httpcore-4.2.1.jar',
-      '/Users/carl/Downloads/servlet-api-5.5.12.jar',
-       '/Users/carl/Downloads/json-20090211.jar'
-      ]
 
 def talkysystem(s, e="An error occurred!")
   puts s
@@ -43,12 +33,18 @@ end
 
 task :build do |t|
   puts '*** building ***'
-  cmd = "javac -Xlint -classpath #{cpl.join(':')} Try.java"
+  cmd = "javac -Xlint Try.java"
   talkysystem(cmd)
 end
 
 task :run => [:build] do |t|
   puts '*** running ***'
-  cmd = "java -classpath #{cpl.join(':')}:. Try"
+  cmd = "java -cp #{ENV['CLASSPATH']}:. Try"
   talkysystem(cmd)
 end
+
+task :server do |t|
+  puts '*** starting selenium+ios-driver standalone server ***'
+  talkysystem("java -jar jarbin/server-standalone-1.0.0-SNAPSHOT.jar -aut #{ENV['APP_DIR']} -port 4444")
+end
+
