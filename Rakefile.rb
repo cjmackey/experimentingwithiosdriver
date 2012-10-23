@@ -48,3 +48,6 @@ task :server do |t|
   talkysystem("java -jar jarbin/server-standalone-1.0.0-SNAPSHOT.jar -aut #{ENV['APP_DIR']} -port 4444")
 end
 
+task :rubytry do |t|
+  talkysystem("ruby try.rb")
+end
