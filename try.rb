@@ -20,15 +20,35 @@ require 'java'
 #puts IOS::UIAModels::Predicates::TypeCriteria.inspect
 
 
-def finder_by_type(s)
-  # for example, find_by_type('UIATableCell')
-  l10n = Java::OrgUiautomationIosUIAModelsPredicate::L10NStrategy.none
-  mat = Java::OrgUiautomationIosUIAModelsPredicate::MatchingStrategy.exact
-  Java::OrgUiautomationIosUIAModelsPredicate::TypeCriteria.new(s, l10n, mat)
-end
 module IOS
-  module O
+  module Predicate
     include_package 'org.uiautomation.ios.UIAModels.predicate'
+  end
+  
+  class Element
+    attr_accessor :raw_element
+    def initialize(opts={})
+      self.raw_element = opts[:raw_element]
+    end
+    def find_element(opts={})
+      crit = Criteria.new(opts)
+      Element.new(:raw_element => self.raw_element.findElement(crit.raw_criteria))
+    rescue org.uiautomation.ios.exceptions.NoSuchElementException
+      nil
+    end
+    def find_elements(opts={})
+      crit = Criteria.new(opts)
+      self.raw_element.findElements(crit.raw_criteria).to_a.map do |re|
+        Element.new(:raw_element => re)
+      end
+    rescue org.uiautomation.ios.exceptions.NoSuchElementException
+      []
+    end
+    
+    # arguably this should be done via method_missing magic
+    def tap
+      self.raw_element.tap
+    end
   end
   
   class Driver < Element
@@ -52,29 +72,6 @@ module IOS
     end
   end
   
-  class Element
-    attr_accessor :raw_element
-    def initialize(opts={})
-      self.raw_element = opts[:raw_element]
-    end
-    def find_element(opts={})
-      crit = Criteria.new(opts)
-      Element.new(:raw_element => self.raw_element.findElement(crit.raw_criteria))
-    rescue org.uiautomation.ios.exceptions.NoSuchElementException
-      nil
-    end
-    def find_elements(opts={})
-      # TODO
-    rescue org.uiautomation.ios.exceptions.NoSuchElementException
-      []
-    end
-    
-    # arguably this should be done via method_missing magic
-    def tap
-      self.raw_element.tap
-    end
-  end
-  
   class Criteria
     attr_accessor :raw_criteria
     def initialize(opts={})
@@ -87,55 +84,69 @@ module IOS
         self.raw_criteria = opts[:raw_criteria]
       else
         crits = []
+        
+        # TODO: make the regexp.source also do things with options (like case insensitivity)
+        
         if opts[:type].kind_of? String
-          l10n = O::L10NStrategy.none
-          mat = O::MatchingStrategy.exact
-          rc = O::TypeCriteria.new(opts[:type], l10n, mat)
-          #l10n = Java::OrgUiautomationIosUIAModelsPredicate::L10NStrategy.none
-          #l10n = Java::OrgUiautomationIosUIAModelsPredicate::L10NStrategy.none
-          #mat = Java::OrgUiautomationIosUIAModelsPredicate::MatchingStrategy.exact
-          # rc = Java::OrgUiautomationIosUIAModelsPredicate::TypeCriteria.new(s, l10n, mat)
-          crit = Criteria.new(:raw_criteria => rc)
-          crits << crit
+          l10n = Predicate::L10NStrategy.none
+          mat = Predicate::MatchingStrategy.exact
+          crits << Predicate::TypeCriteria.new(opts[:type], l10n, mat)
+        elsif opts[:type].kind_of? Regexp
+          l10n = Predicate::L10NStrategy.none
+          mat = Predicate::MatchingStrategy.regex
+          crits << Predicate::TypeCriteria.new(opts[:type].source, l10n, mat)
         end
         
-        # TODO: more kinds of picking
+        if opts[:label].kind_of? String
+          crits << Predicate::LabelCriteria.new(opts[:label])
+        elsif opts[:label].kind_of? Regexp
+          crits << Predicate::LabelCriteria.new(opts[:label].source,
+                                                Predicate::MatchingStrategy.regex)
+        end
+        
+        if opts[:name].kind_of? String
+          crits << Predicate::NameCriteria.new(opts[:name])
+        elsif opts[:name].kind_of? String
+          crits << Predicate::NameCriteria.new(opts[:name].source,
+                                               Predicate::MatchingStrategy.regex)
+        end
+        
+        # TODO: more kinds of picking -- value, properties
         
         if crits.size < 1
-          self.raw_criteria = Java::OrgUiautomationIosUIAModelsPredicate::EmptyCriteria.new
+          self.raw_criteria = Predicate::EmptyCriteria.new
         elsif crits.size == 1
-          self.raw_criteria = crits[0].raw_criteria
+          self.raw_criteria = crits[0]
         else
-          # TODO: `and` them
+          self.raw_criteria = Predicate::AndCriteria.new(*crits)
         end
       end
     end
     def or(*args)
       margs = ([self] + args).map { |x| x.raw_criteria }
-      Criteria.new(:raw_criteria =>
-                   Java::OrgUiautomationIosUIAModelsPredicate::OrCritera.new(margs))
+      Criteria.new(:raw_criteria => Predicate::OrCritera.new(*margs))
     end
     def and(*args)
       margs = ([self] + args).map { |x| x.raw_criteria }
-      Criteria.new(:raw_criteria => 
-                   Java::OrgUiautomationIosUIAModelsPredicate::AndCritera.new(margs))
+      Criteria.new(:raw_criteria => Predicate::AndCritera.new(*margs))
     end
-    def not(*args)
-      Criteria.new(:raw_criteria => 
-                   Java::OrgUiautomationIosUIAModelsPredicate::AndCritera.new(self.raw_criteria))
+    def not
+      Criteria.new(:raw_criteria => Predicate::NotCritera.new(self.raw_criteria))
     end
   end
 end
-
-# O::TypeCriteria.new('UIATableCell', O::L10NStrategy.none, O::MatchingStrategy.exact)
-# IOS::UIAModels::Predicates::TypeCriteria.new('UIATableCell', 
-
 
 
 
 
 driver = IOS::Driver.new
-somecell = driver.find_element(:type => 'UIATableCell')
+# Hmm. multiple criteria doesn't seem to work :(
+# LocalJumpError: yield called out of block
+#      tap at org/jruby/RubyKernel.java:1787
+#   (root) at try.rb:146
+somecell = driver.find_element( :label => 'Mountain 4' )
+                               # :type => 'UIATableCell')#, 
+                               #:label => /3/)
 somecell.tap
 driver.take_screenshot('step2-ruby.png')
 driver.quit
